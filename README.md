@@ -1,7 +1,19 @@
 # INSTAGRAM-MASS-REPORTER-
 # INSTAGRAM MASS REPORTER TOOL SUPER FAST BAN ACCOUNT 🙏
 
+# NEEDS :
+
 👉 NEED 30 MAXIMUM ACCOUNTS OF INSTAGRAM THEN IT WILL MASS REPORT TO THE SCAMMER.
+
+👉 NEED TERMUX / PYDROID 
+
+# INSTALLATION 
+
+Apt install update
+Apt install upgrade 
+Apt install git 
+pip install requests fake-useragent
+git clone  
 
 # Features:
 
