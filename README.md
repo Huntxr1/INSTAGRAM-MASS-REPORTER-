@@ -19,9 +19,13 @@
 
 git clone https://github.com/Shrijantiwari/INSTAGRAM-MASS-REPORTER-.git
 
+cd INSTAGRAM-MASS-REPORTER-
+
 pip install requests fake-useragent
 
-Python insta.py
+ls
+
+python insta.py
 
 ```
  
