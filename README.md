@@ -1,5 +1,6 @@
 # INSTAGRAM-MASS-REPORTER-
 ## INSTAGRAM MASS REPORTER TOOL SUPER FAST BAN ACCOUNT 🙏
+![1000023011](https://github.com/user-attachments/assets/10a8492b-ae5d-48ff-a055-55f4d12e7a47)
 
 ## 🚀 Key Features
 - Supports multiple Instagram accounts for reporting.
@@ -10,9 +11,9 @@
 - 
 ### Customization :
 
-👉 ADD ACCOUNT FIRST 30 THEN IT WILL MASS REPORT TO THE SCAMMER .
+👉 - ADD ACCOUNT FIRST 30 THEN IT WILL MASS REPORT TO THE SCAMMER .
 
-👉 NEED TERMUX / PYDROID 
+👉 - NEED TERMUX / PYDROID 
 
 ### INSTALLATION 
 ```
@@ -34,11 +35,12 @@ python insta.py
 
  The Instagram Reporting program comes with several handy features:
 
-👉 1. Latest Report Method: The tool uses the most up-to-date reporting method, ensuring your reports are effective and impactful.
+👉  - 1. Latest Report Method: The tool uses the most up-to-date reporting method, ensuring your reports are effective and impactful.
 
-👉 2.  Based On Proxies: By leveraging proxies, the program enhances its reporting capabilities and helps you report multiple accounts efficiently. **
+👉 - 2.  Based On Proxies: By leveraging proxies, the program enhances its reporting capabilities and helps you report multiple accounts efficiently. **
 
-👉 3. Easy for Beginners: You don't need to be an expert to use this tool. Its user-friendly interface makes it accessible to users of all levels. 
+
+👉 - 3. Easy for Beginners: You don't need to be an expert to use this tool. Its user-friendly interface makes it accessible to users of all levels. 
 
 # ⚠️ Important Notice 
 
