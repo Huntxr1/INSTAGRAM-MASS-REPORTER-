@@ -6,34 +6,17 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 import requests
 from fake_useragent import UserAgent
-from queue import Queue
 import json
+try:
+    import tkinter as tk
+    from tkinter import messagebox
+except ImportError:
+    tk = None  # Fallback to terminal if tkinter is unavailable
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Function to generate ANSI color codes for gradient effect
-def get_gradient_color(step, total_steps):
-    colors = [
-        (0, 255, 0),    # Green
-        (255, 255, 0),  # Yellow
-        (255, 255, 255),# White
-        (255, 105, 180),# Pink
-        (0, 191, 255),  # Sky Blue
-        (255, 165, 0),  # Orange
-        (128, 0, 128)   # Purple
-    ]
-    idx = (step % total_steps) / total_steps * (len(colors) - 1)
-    i = int(idx)
-    frac = idx - i
-    r1, g1, b1 = colors[i]
-    r2, g2, b2 = colors[i + 1] if i + 1 < len(colors) else colors[i]
-    r = int(r1 + (r2 - r1) * frac)
-    g = int(g1 + (g2 - g1) * frac)
-    b = int(b1 + (b2 - b1) * frac)
-    return f"\033[48;2;{r};{g};{b}m"
-
-# Function to display ASCII art with animated background
+# Function to display ASCII art (fallback for terminal)
 def display_ascii_art():
     ascii_art = """
 █ █▄░█ █▀ ▀█▀ ▄▀█
@@ -42,28 +25,11 @@ def display_ascii_art():
 █▀█ █▀▀ █▀█ █▀█ █▀█ ▀█▀ █▀▀ █▀█
 █▀▄ ██▄ █▀▀ █▄█ █▀▄ ░█░ ██▄ █▀▄
 
-𝗜𝗡𝗦𝗧𝗔𝗚𝗥𝗔𝗠 𝗥𝗘𝗣𝗢𝗥𝗧𝗘𝗥
+𝗜𝗡�_S𝗧𝗔𝗚𝗥𝗔𝗠 𝗥𝗘𝗣𝗢𝗥𝗧𝗘𝗥
 
 𝗦C𝗥𝗜𝗣𝗧 𝗕𝗬 𝗦𝗛𝗥𝗜𝗝𝗔𝗡 𝗧𝗜𝗪𝗔𝗥𝗜 
 """
-    lines = ascii_art.split('\n')
-    total_steps = 50  # Controls speed of color change
-    try:
-        for step in range(total_steps):
-            os.system('cls' if os.name == 'nt' else 'clear')  # Clear terminal
-            for line in lines:
-                color = get_gradient_color(step, total_steps)
-                reset = "\033[0m"
-                # Pad line to ensure full background coverage
-                padded_line = line.ljust(50)
-                print(f"{color}{padded_line}{reset}")
-            time.sleep(0.1)  # Animation speed
-    except KeyboardInterrupt:
-        pass
-    finally:
-        os.system('cls' if os.name == 'nt' else 'clear')  # Clear terminal after animation
-        # Print static version for script continuation
-        print(ascii_art)
+    print(ascii_art)
 
 # Function to load accounts from accounts.json
 def load_accounts():
@@ -100,16 +66,10 @@ class InstagramReporter:
         self.ua = UserAgent()
         self.base_url = "https://www.instagram.com"
         self.lock = threading.Lock()
-        # Define possible reporting reasons
+        self.session = None
         self.report_reasons = [
-            "spam",              # Automated or repetitive content
-            "inappropriate",     # Offensive or harmful content
-            "harassment",        # Bullying or abusive behavior
-            "impersonation",     # Pretending to be someone else
-            "scam",              # Fraudulent or deceptive content
-            "hate_speech",       # Discriminatory or hateful content
-            "violence",          # Threats or violent content
-            "nudity",            # Explicit or adult content
+            "spam", "inappropriate", "harassment", "impersonation",
+            "scam", "hate_speech", "violence", "nudity"
         ]
 
     def get_session(self):
@@ -122,7 +82,7 @@ class InstagramReporter:
         })
         return session
 
-    def login(self, session, retries=2):
+    def login(self, session, retries=3):
         for attempt in range(retries):
             try:
                 response = session.get(f"{self.base_url}/accounts/login/", timeout=5)
@@ -157,13 +117,22 @@ class InstagramReporter:
         logging.error(f"Login failed for {self.username} after {retries} attempts")
         return None
 
+    def initialize_session(self):
+        if self.session is None:
+            self.session = self.get_session()
+            self.session = self.login(self.session)
+        return self.session is not None
+
+    def refresh_session(self):
+        logging.info(f"Refreshing session for {self.username}")
+        self.session = None
+        return self.initialize_session()
+
     def report_user(self, target_username, reason=None):
-        session = self.get_session()
-        session = self.login(session)
-        if not session:
+        if not self.session:
+            logging.error(f"No active session for {self.username}")
             return False
 
-        # Select a random reason if none provided
         selected_reason = random.choice(self.report_reasons) if reason is None else reason
         if selected_reason not in self.report_reasons:
             logging.warning(f"Invalid reason '{selected_reason}' for {self.username}, defaulting to 'spam'")
@@ -171,10 +140,21 @@ class InstagramReporter:
 
         try:
             profile_url = f"{self.base_url}/{target_username}/"
-            response = session.get(profile_url, timeout=5)
+            response = self.session.get(profile_url, timeout=5)
             if response.status_code != 200:
-                logging.error(f"Failed to access {target_username}'s profile with {self.username}")
-                return False
+                if response.status_code == 403:
+                    logging.warning(f"Session expired for {self.username}, refreshing")
+                    if self.refresh_session():
+                        response = self.session.get(profile_url, timeout=5)
+                        if response.status_code != 200:
+                            logging.error(f"Failed to access {target_username}'s profile with {self.username}")
+                            return False
+                    else:
+                        logging.error(f"Failed to refresh session for {self.username}")
+                        return False
+                else:
+                    logging.error(f"Failed to access {target_username}'s profile with {self.username}: {response.status_code}")
+                    return False
 
             user_id = None
             try:
@@ -190,86 +170,239 @@ class InstagramReporter:
                 "frx_prompt_request_type": "1"
             }
             headers = {
-                "X-CSRFToken": session.cookies.get("csrftoken"),
+                "X-CSRFToken": self.session.cookies.get("csrftoken"),
                 "X-Requested-With": "XMLHttpRequest",
                 "Content-Type": "application/x-www-form-urlencoded",
             }
-            response = session.post(report_url, data=payload, headers=headers, timeout=5)
+            response = self.session.post(report_url, data=payload, headers=headers, timeout=5)
             if response.status_code == 200:
                 logging.info(f"Successfully reported {target_username} with {self.username} for '{selected_reason}'")
                 return True
             else:
                 logging.error(f"Report failed for {target_username} with {self.username} for '{selected_reason}': {response.status_code}")
+                if response.status_code == 403:
+                    logging.warning(f"Session expired during report for {self.username}, refreshing")
+                    if self.refresh_session():
+                        response = self.session.post(report_url, data=payload, headers=headers, timeout=5)
+                        if response.status_code == 200:
+                            logging.info(f"Successfully reported {target_username} with {self.username} after session refresh")
+                            return True
                 return False
         except Exception as e:
             logging.error(f"Report error for {target_username} with {self.username} for '{selected_reason}': {e}")
             return False
 
-# Worker function for multithreading
-def worker(reporter, target_username, report_queue):
-    while not report_queue.empty():
-        report_count = report_queue.get()
-        # Randomly select a reason for each report
-        success = reporter.report_user(target_username, reason=None)
+# Worker function to handle reporting for one account
+def make_reports(reporter, target_username, num_reports):
+    if not reporter.initialize_session():
+        logging.error(f"Skipping reports for {reporter.username} due to login failure")
+        return
+
+    for i in range(num_reports):
+        success = reporter.report_user(target_username)
         with reporter.lock:
             if success:
-                logging.info(f"Report #{report_count} completed by {reporter.username}")
+                logging.info(f"Report #{i + 1} completed by {reporter.username}")
             else:
-                logging.warning(f"Report #{report_count} failed by {reporter.username}")
-        report_queue.task_done()
-        time.sleep(random.uniform(0.5, 1.5))
+                logging.warning(f"Report #{i + 1} failed by {reporter.username}")
+        time.sleep(random.uniform(0.3, 0.8))  # Reduced delay for speed
 
 # Main function to manage reporting
-def mass_report(target_username, accounts, num_reports_per_account=1, max_workers=5):
-    report_queue = Queue()
-    for i in range(len(accounts) * num_reports_per_account):
-        report_queue.put(i + 1)
-
-    reporters = [InstagramReporter(username, password) for username, password in accounts]
+def mass_report(target_username, accounts, num_reports_per_account=1, max_workers=10):
+    if not accounts:
+        logging.error("No accounts provided for reporting")
+        return
 
     logging.info(f"Starting {len(accounts) * num_reports_per_account} reports for {target_username} with {max_workers} threads")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for reporter in reporters:
-            executor.submit(worker, reporter, target_username, report_queue)
+        for username, password in accounts:
+            reporter = InstagramReporter(username, password)
+            executor.submit(make_reports, reporter, target_username, num_reports_per_account)
 
-    report_queue.join()
     logging.info("All reports completed")
+
+# GUI for splash screen and reporting input
+def run_gui():
+    def show_splash():
+        root = tk.Tk()
+        root.title("Instagram Reporter")
+        root.geometry("400x300")
+
+        # Colors for background cycle
+        colors = ["#1E90FF", "#FF0000", "#800080", "#008000"]  # Blue, Red, Purple, Green
+        color_index = [0]
+
+        # Label for typewriter effect
+        splash_label = tk.Label(
+            root, 
+            text="",
+            font=("Courier", 24, "bold"),  # Typewriter font
+            fg="#FFFFFF",
+            bg=colors[color_index[0]]
+        )
+        splash_label.pack(expand=True)
+
+        def update_background():
+            color_index[0] = (color_index[0] + 1) % len(colors)
+            root.configure(bg=colors[color_index[0]])
+            splash_label.configure(bg=colors[color_index[0]])
+            root.after(1000, update_background)  # Change every 1 second
+
+        def typewriter_effect():
+            full_text = "SHRIJAN TIWARI"
+            current_text = [""]
+
+            def type_forward(pos=0):
+                if pos < len(full_text):
+                    current_text[0] = full_text[:pos + 1]
+                    splash_label.configure(text=current_text[0])
+                    root.after(100, type_forward, pos + 1)
+                else:
+                    root.after(500, type_backward, len(full_text))
+
+            def type_backward(pos):
+                if pos > 0:
+                    current_text[0] = full_text[:pos - 1]
+                    splash_label.configure(text=current_text[0])
+                    root.after(100, type_backward, pos - 1)
+                else:
+                    root.after(500, type_forward, 0)  # Optional: loop once
+
+            type_forward()
+
+        # Start animations
+        root.configure(bg=colors[0])
+        update_background()
+        typewriter_effect()
+
+        # Redirect after 4 seconds
+        root.after(4000, lambda: [root.destroy(), show_reporting_page()])
+        root.mainloop()
+
+    def show_reporting_page():
+        reporting_window = tk.Tk()
+        reporting_window.title("Instagram Reporting Tool")
+        reporting_window.geometry("400x400")
+        reporting_window.configure(bg="#000000")  # Black background for reporting page
+
+        # Reporting form
+        tk.Label(
+            reporting_window, 
+            text="Instagram Mass Reporter",
+            font=("Arial", 18, "bold"),
+            fg="#FFFFFF",
+            bg="#000000"
+        ).pack(pady=20)
+
+        tk.Label(
+            reporting_window, 
+            text="Target Username:",
+            font=("Arial", 12),
+            fg="#FFFFFF",
+            bg="#000000"
+        ).pack()
+        username_entry = tk.Entry(reporting_window, width=30)
+        username_entry.pack(pady=5)
+
+        tk.Label(
+            reporting_window, 
+            text="Reports per Account:",
+            font=("Arial", 12),
+            fg="#FFFFFF",
+            bg="#000000"
+        ).pack()
+        reports_entry = tk.Entry(reporting_window, width=30)
+        reports_entry.pack(pady=5)
+
+        def start_reporting():
+            target_user = username_entry.get().strip()
+            reports_str = reports_entry.get().strip()
+
+            if not target_user:
+                messagebox.showerror("Error", "Username cannot be empty.")
+                return
+            try:
+                num_reports = int(reports_str)
+                if num_reports < 1:
+                    messagebox.showerror("Error", "Number of reports must be at least 1.")
+                    return
+            except ValueError:
+                messagebox.showerror("Error", "Please enter a valid number for reports.")
+                return
+
+            accounts = load_accounts()
+            if not accounts:
+                messagebox.showerror("Error", "No valid accounts loaded from accounts.json. Please check the file.")
+                return
+
+            reporting_window.destroy()  # Close GUI
+            mass_report(target_user, accounts, num_reports_per_account=num_reports, max_workers=10)
+            show_splash()  # Restart GUI after reporting
+
+        tk.Button(
+            reporting_window,
+            text="Start Reporting",
+            command=start_reporting,
+            font=("Arial", 12),
+            bg="#FF0000",
+            fg="#FFFFFF",
+            activebackground="#CC0000"
+        ).pack(pady=20)
+
+        reporting_window.mainloop()
+
+    show_splash()
+
+# Fallback terminal input
+def run_terminal():
+    while True:
+        os.system('cls' if os.name == 'nt' else 'clear')  # Clear terminal
+        display_ascii_art()
+        accounts = load_accounts()
+        if not accounts:
+            logging.error("No valid accounts loaded from accounts.json. Press Enter to retry.")
+            input()
+            continue
+
+        target_user = None
+        for _ in range(3):
+            target_user = input("Enter the Instagram username to report: ").strip()
+            if target_user:
+                break
+            logging.warning("Username cannot be empty. Try again.")
+        if not target_user:
+            logging.error("No valid username provided after 3 attempts. Press Enter to retry.")
+            input()
+            continue
+
+        num_reports = None
+        for _ in range(3):
+            try:
+                num_reports = int(input("Enter the number of reports per account: ").strip())
+                if num_reports < 1:
+                    logging.warning("Number of reports must be at least 1. Try again.")
+                    continue
+                break
+            except ValueError:
+                logging.warning("Invalid number of reports. Please enter a number. Try again.")
+        if num_reports is None:
+            logging.error("No valid number of reports provided after 3 attempts. Press Enter to retry.")
+            input()
+            continue
+
+        mass_report(target_user, accounts, num_reports_per_account=num_reports, max_workers=10)
+        logging.info("Reporting completed. Press Enter to start again or Ctrl+C to exit.")
+        input()
 
 # Main execution
 if __name__ == "__main__":
-    # Display ASCII art with animated background
-    display_ascii_art()
-
-    # Load accounts from accounts.json
-    accounts = load_accounts()
-    if not accounts:
-        logging.error("No valid accounts loaded from accounts.json. Exiting.")
-        exit(1)
-
-    # Prompt for target username with retries
-    for _ in range(3):
-        target_user = input("Enter the Instagram username to report: ").strip()
-        if target_user:
-            break
-        logging.warning("Username cannot be empty. Try again.")
-    else:
-        logging.error("No valid username provided after 3 attempts. Exiting.")
-        exit(1)
-
-    # Prompt for number of reports per account with retries
-    for _ in range(3):
+    if tk:
         try:
-            num_reports = int(input("Enter the number of reports per account: ").strip())
-            if num_reports < 1:
-                logging.warning("Number of reports must be at least 1. Try again.")
-                continue
-            break
-        except ValueError:
-            logging.warning("Invalid number of reports. Please enter a number. Try again.")
+            run_gui()
+        except Exception as e:
+            logging.error(f"GUI failed: {e}. Falling back to terminal.")
+            run_terminal()
     else:
-        logging.error("No valid number of reports provided after 3 attempts. Exiting.")
-        exit(1)
-
-    # Proceed with reporting
-    mass_report(target_user, accounts, num_reports_per_account=num_reports, max_workers=5)
+        logging.warning("tkinter not available. Using terminal interface.")
+        run_terminal()
