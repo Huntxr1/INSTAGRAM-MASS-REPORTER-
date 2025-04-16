@@ -9,9 +9,24 @@ from fake_useragent import UserAgent
 import json
 try:
     import tkinter as tk
-    from tkinter import messagebox
+    from tkinter import messagebox, scrolledtext
+    from tkinter.ttk import Progressbar
 except ImportError:
     tk = None  # Fallback to terminal if tkinter is unavailable
+
+# Custom logging handler to update GUI text area
+class TextAreaHandler(logging.Handler):
+    def __init__(self, text_widget):
+        super().__init__()
+        self.text_widget = text_widget
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.text_widget.configure(state='normal')
+        self.text_widget.insert(tk.END, msg + '\n')
+        self.text_widget.see(tk.END)
+        self.text_widget.configure(state='disabled')
+        self.text_widget.update()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,9 +40,9 @@ def display_ascii_art():
 █▀█ █▀▀ █▀█ █▀█ █▀█ ▀█▀ █▀▀ █▀█
 █▀▄ ██▄ █▀▀ █▄█ █▀▄ ░█░ ██▄ █▀▄
 
-𝗜𝗡�_S𝗧𝗔𝗚𝗥𝗔𝗠 𝗥𝗘𝗣𝗢𝗥𝗧𝗘𝗥
+𝗜𝗡𝗦𝗧𝗔𝗚𝗥𝗔𝗠 𝗥𝗘𝗣𝗢𝗥𝗧𝗘𝗥
 
-𝗦C𝗥𝗜𝗣𝗧 𝗕𝗬 𝗦𝗛𝗥𝗜𝗝𝗔𝗡 𝗧𝗜𝗪𝗔𝗥𝗜 
+𝗦C𝗥𝗜𝗣𝗧 𝗕𝗬 𝗦�_H𝗥𝗜𝗝𝗔𝗡 𝗧𝗜𝗪𝗔𝗥𝗜 
 """
     print(ascii_art)
 
@@ -193,7 +208,7 @@ class InstagramReporter:
             return False
 
 # Worker function to handle reporting for one account
-def make_reports(reporter, target_username, num_reports):
+def make_reports(reporter, target_username, num_reports, progress_callback=None):
     if not reporter.initialize_session():
         logging.error(f"Skipping reports for {reporter.username} due to login failure")
         return
@@ -205,10 +220,12 @@ def make_reports(reporter, target_username, num_reports):
                 logging.info(f"Report #{i + 1} completed by {reporter.username}")
             else:
                 logging.warning(f"Report #{i + 1} failed by {reporter.username}")
+            if progress_callback:
+                progress_callback(success)
         time.sleep(random.uniform(0.3, 0.8))  # Reduced delay for speed
 
 # Main function to manage reporting
-def mass_report(target_username, accounts, num_reports_per_account=1, max_workers=10):
+def mass_report(target_username, accounts, num_reports_per_account=1, max_workers=10, progress_callback=None):
     if not accounts:
         logging.error("No accounts provided for reporting")
         return
@@ -218,11 +235,11 @@ def mass_report(target_username, accounts, num_reports_per_account=1, max_worker
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for username, password in accounts:
             reporter = InstagramReporter(username, password)
-            executor.submit(make_reports, reporter, target_username, num_reports_per_account)
+            executor.submit(make_reports, reporter, target_username, num_reports_per_account, progress_callback)
 
     logging.info("All reports completed")
 
-# GUI for splash screen and reporting input
+# GUI for splash screen, reporting input, and progress
 def run_gui():
     def show_splash():
         root = tk.Tk()
@@ -266,8 +283,6 @@ def run_gui():
                     current_text[0] = full_text[:pos - 1]
                     splash_label.configure(text=current_text[0])
                     root.after(100, type_backward, pos - 1)
-                else:
-                    root.after(500, type_forward, 0)  # Optional: loop once
 
             type_forward()
 
@@ -284,7 +299,7 @@ def run_gui():
         reporting_window = tk.Tk()
         reporting_window.title("Instagram Reporting Tool")
         reporting_window.geometry("400x400")
-        reporting_window.configure(bg="#000000")  # Black background for reporting page
+        reporting_window.configure(bg="#000000")
 
         # Reporting form
         tk.Label(
@@ -336,9 +351,8 @@ def run_gui():
                 messagebox.showerror("Error", "No valid accounts loaded from accounts.json. Please check the file.")
                 return
 
-            reporting_window.destroy()  # Close GUI
-            mass_report(target_user, accounts, num_reports_per_account=num_reports, max_workers=10)
-            show_splash()  # Restart GUI after reporting
+            reporting_window.destroy()  # Close reporting form
+            show_progress_window(target_user, accounts, num_reports)
 
         tk.Button(
             reporting_window,
@@ -351,6 +365,71 @@ def run_gui():
         ).pack(pady=20)
 
         reporting_window.mainloop()
+
+    def show_progress_window(target_username, accounts, num_reports_per_account):
+        progress_window = tk.Tk()
+        progress_window.title("Reporting Progress")
+        progress_window.geometry("500x400")
+        progress_window.configure(bg="#000000")
+
+        # Status label
+        status_label = tk.Label(
+            progress_window,
+            text="Starting reports...",
+            font=("Arial", 14, "bold"),
+            fg="#FFFFFF",
+            bg="#000000"
+        )
+        status_label.pack(pady=10)
+
+        # Progress bar
+        total_reports = len(accounts) * num_reports_per_account
+        progress_bar = Progressbar(
+            progress_window,
+            length=400,
+            maximum=total_reports,
+            style="red.Horizontal.TProgressbar"
+        )
+        progress_bar.pack(pady=10)
+
+        # Text area for logs
+        log_area = scrolledtext.ScrolledText(
+            progress_window,
+            width=60,
+            height=15,
+            font=("Courier", 10),
+            fg="#FFFFFF",
+            bg="#333333",
+            state='disabled'
+        )
+        log_area.pack(pady=10)
+
+        # Configure progress bar style
+        progress_window.style = tk.ttk.Style()
+        progress_window.style.configure("red.Horizontal.TProgressbar", background="#FF0000")
+
+        # Set up logging to text area
+        text_handler = TextAreaHandler(log_area)
+        text_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logging.getLogger().addHandler(text_handler)
+
+        completed_reports = [0]
+        def progress_callback(success):
+            completed_reports[0] += 1
+            progress_bar['value'] = completed_reports[0]
+            progress_window.update()
+            if completed_reports[0] >= total_reports:
+                status_label.configure(text="Reporting completed!")
+                progress_window.after(1000, lambda: [progress_window.destroy(), logging.getLogger().removeHandler(text_handler), show_splash()])
+
+        # Start reporting in a separate thread
+        threading.Thread(
+            target=mass_report,
+            args=(target_username, accounts, num_reports_per_account, 10, progress_callback),
+            daemon=True
+        ).start()
+
+        progress_window.mainloop()
 
     show_splash()
 
