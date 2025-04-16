@@ -23,6 +23,8 @@ git clone https://github.com/Shrijantiwari/INSTAGRAM-MASS-REPORTER-.git
 
 cd INSTAGRAM-MASS-REPORTER-
 
+pip install tkinter
+
 pip install requests fake-useragent
 
 ls
