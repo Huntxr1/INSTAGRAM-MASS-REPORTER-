@@ -9,12 +9,12 @@
 - Offers various reporting reasons (spam, harassment, etc.).
 - Multi-threaded for faster execution.
 - Animated ASCII art for a sleek interface.
-- 
+
 ### Customization :
 
-👉 - ADD ACCOUNT FIRST 30 THEN IT WILL MASS REPORT TO THE SCAMMER .
+ - ADD ACCOUNT IN ACCOUNT.JSON THEN IT WILL MASS REPORT TO THE SCAMMER  .
 
-👉 - NEED TERMUX / PYDROID 
+ - NEED TERMUX / PYDROID 
 
 ### INSTALLATION 
 ```
