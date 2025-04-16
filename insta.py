@@ -7,6 +7,7 @@ import logging
 import requests
 from fake_useragent import UserAgent
 import json
+import webbrowser
 try:
     import tkinter as tk
     from tkinter import messagebox, scrolledtext
@@ -42,7 +43,7 @@ def display_ascii_art():
 
 𝗜𝗡𝗦𝗧𝗔𝗚𝗥𝗔𝗠 𝗥𝗘𝗣𝗢𝗥𝗧𝗘𝗥
 
-𝗦C𝗥𝗜𝗣𝗧 𝗕𝗬 𝗦�_H𝗥𝗜𝗝𝗔𝗡 𝗧𝗜𝗪𝗔𝗥𝗜 
+𝗦C𝗥𝗜𝗣𝗧 𝗕𝗬 𝗦𝗛𝗥𝗜𝗝𝗔𝗡 𝗧𝗜𝗪𝗔𝗥𝗜 
 """
     print(ascii_art)
 
@@ -241,6 +242,9 @@ def mass_report(target_username, accounts, num_reports_per_account=1, max_worker
 
 # GUI for splash screen, reporting input, and progress
 def run_gui():
+    # Redirect to WhatsApp channel at the start
+    webbrowser.open("https://whatsapp.com/channel/0029Vb5btVqDeON7IdBgvF3n")
+
     def show_splash():
         root = tk.Tk()
         root.title("Instagram Reporter")
@@ -254,7 +258,7 @@ def run_gui():
         splash_label = tk.Label(
             root, 
             text="",
-            font=("Courier", 24, "bold"),  # Typewriter font
+            font=("Courier", 24, "bold"),
             fg="#FFFFFF",
             bg=colors[color_index[0]]
         )
@@ -291,7 +295,7 @@ def run_gui():
         update_background()
         typewriter_effect()
 
-        # Redirect after 4 seconds
+        # Show reporting page after 4 seconds
         root.after(4000, lambda: [root.destroy(), show_reporting_page()])
         root.mainloop()
 
@@ -379,8 +383,7 @@ def run_gui():
             font=("Arial", 14, "bold"),
             fg="#FFFFFF",
             bg="#000000"
-        )
-        status_label.pack(pady=10)
+        ).pack(pady=10)
 
         # Progress bar
         total_reports = len(accounts) * num_reports_per_account
@@ -438,6 +441,7 @@ def run_terminal():
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')  # Clear terminal
         display_ascii_art()
+        logging.info("WhatsApp channel redirect not available in terminal mode. Visit: https://whatsapp.com/channel/0029Vb5btVqDeON7IdBgvF3n")
         accounts = load_accounts()
         if not accounts:
             logging.error("No valid accounts loaded from accounts.json. Press Enter to retry.")
