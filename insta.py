@@ -7,6 +7,7 @@ import logging
 import requests
 from fake_useragent import UserAgent
 from queue import Queue
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -64,40 +65,38 @@ def display_ascii_art():
         # Print static version for script continuation
         print(ascii_art)
 
-# Function to create empty proxy files if they don't exist
-def create_proxy_files():
-    proxy_files = ['http_proxies.txt', 'socks4_proxies.txt', 'socks5_proxies.txt']
-    for filename in proxy_files:
-        if not os.path.exists(filename):
-            with open(filename, 'w') as file:
-                pass  # Create empty file
-            logging.info(f"Created empty {filename}")
-        else:
-            logging.info(f"{filename} already exists, using it")
-
-# Function to load and validate proxies from all files
-def load_all_proxies():
-    proxies = []
-    for file in ['http_proxies.txt', 'socks4_proxies.txt', 'socks5_proxies.txt']:
-        if os.path.exists(file):
-            with open(file, 'r') as f:
-                file_proxies = [line.strip() for line in f if line.strip()]
-                for proxy in file_proxies:
-                    if ':' in proxy and len(proxy.split(':')) == 2:
-                        proxies.append(proxy)
-                    else:
-                        logging.warning(f"Invalid proxy format in {file}: {proxy}")
-            logging.info(f"Loaded {len(file_proxies)} proxies from {file}")
-        else:
-            logging.warning(f"{file} not found")
-    return proxies
+# Function to load accounts from accounts.json
+def load_accounts():
+    accounts_file = 'accounts.json'
+    if not os.path.exists(accounts_file):
+        logging.error(f"{accounts_file} not found. Please create it with account credentials.")
+        return []
+    
+    try:
+        with open(accounts_file, 'r') as f:
+            accounts_data = json.load(f)
+            accounts = []
+            for account in accounts_data:
+                username = account.get('username')
+                password = account.get('password')
+                if username and password:
+                    accounts.append((username, password))
+                else:
+                    logging.warning(f"Invalid account entry in {accounts_file}: {account}")
+            logging.info(f"Loaded {len(accounts)} accounts from {accounts_file}")
+            return accounts
+    except json.JSONDecodeError as e:
+        logging.error(f"Error parsing {accounts_file}: {e}")
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected error reading {accounts_file}: {e}")
+        return []
 
 # Instagram Reporter class
 class InstagramReporter:
-    def __init__(self, username, password, proxies):
+    def __init__(self, username, password):
         self.username = username
         self.password = password
-        self.proxies = proxies
         self.ua = UserAgent()
         self.base_url = "https://www.instagram.com"
         self.lock = threading.Lock()
@@ -121,15 +120,6 @@ class InstagramReporter:
             "Accept-Language": "en-US,en;q=0.5",
             "Referer": self.base_url,
         })
-        if self.proxies:
-            proxy = random.choice(self.proxies)
-            logging.info(f"{self.username} using proxy: {proxy}")
-            session.proxies = {
-                "http": f"http://{proxy}",
-                "https": f"socks5://{proxy}" if "1080" in proxy else f"http://{proxy}",
-            }
-        else:
-            logging.warning(f"No proxies available for {self.username}, proceeding without proxy")
         return session
 
     def login(self, session, retries=2):
@@ -230,19 +220,12 @@ def worker(reporter, target_username, report_queue):
         time.sleep(random.uniform(0.5, 1.5))
 
 # Main function to manage reporting
-def mass_report(target_username, accounts, proxies, num_reports_per_account=1, max_workers=5):
-    create_proxy_files()
-    if not proxies:
-        logging.error("No proxies found in files. Need proxies to proceed.")
-        return
-    if len(proxies) < len(accounts):
-        logging.warning(f"Only {len(proxies)} proxies available for {len(accounts)} accounts. Some accounts may share proxies.")
-
+def mass_report(target_username, accounts, num_reports_per_account=1, max_workers=5):
     report_queue = Queue()
     for i in range(len(accounts) * num_reports_per_account):
         report_queue.put(i + 1)
 
-    reporters = [InstagramReporter(username, password, proxies) for username, password in accounts]
+    reporters = [InstagramReporter(username, password) for username, password in accounts]
 
     logging.info(f"Starting {len(accounts) * num_reports_per_account} reports for {target_username} with {max_workers} threads")
 
@@ -253,24 +236,16 @@ def mass_report(target_username, accounts, proxies, num_reports_per_account=1, m
     report_queue.join()
     logging.info("All reports completed")
 
-# Hardcoded list of 30 Instagram accounts (replace with real credentials)
-accounts = [
-    ("user1_insta", "pass1234"), ("user2_insta", "secure567"), ("user3_insta", "mypwd890"),
-    ("user4_insta", "instapass1"), ("user5_insta", "pass4321"), ("user6_insta", "login987"),
-    ("user7_insta", "secret321"), ("user8_insta", "pwd654"), ("user9_insta", "insta111"),
-    ("user10_insta", "pass222"), ("user11_insta", "login333"), ("user12_insta", "secure444"),
-    ("user13_insta", "mypwd555"), ("user14_insta", "instapass6"), ("user15_insta", "pass777"),
-    ("user16_insta", "login888"), ("user17_insta", "secret999"), ("user18_insta", "pwd000"),
-    ("user19_insta", "instaabc"), ("user20_insta", "passdef"), ("user21_insta", "loginghi"),
-    ("user22_insta", "securejkl"), ("user23_insta", "mypwdmno"), ("user24_insta", "instapqr"),
-    ("user25_insta", "passstu"), ("user26_insta", "loginvwx"), ("user27_insta", "secretyz"),
-    ("user28_insta", "pwd123abc"), ("user29_insta", "insta456def"), ("user30_insta", "pass789ghi")
-]
-
 # Main execution
 if __name__ == "__main__":
     # Display ASCII art with animated background
     display_ascii_art()
+
+    # Load accounts from accounts.json
+    accounts = load_accounts()
+    if not accounts:
+        logging.error("No valid accounts loaded from accounts.json. Exiting.")
+        exit(1)
 
     # Prompt for target username with retries
     for _ in range(3):
@@ -296,11 +271,5 @@ if __name__ == "__main__":
         logging.error("No valid number of reports provided after 3 attempts. Exiting.")
         exit(1)
 
-    # Load proxies
-    proxies = load_all_proxies()
-    if not proxies:
-        logging.error("No proxies available. Cannot report.")
-        exit(1)
-
     # Proceed with reporting
-    mass_report(target_user, accounts, proxies, num_reports_per_account=num_reports, max_workers=5)
+    mass_report(target_user, accounts, num_reports_per_account=num_reports, max_workers=5)
